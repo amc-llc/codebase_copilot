@@ -22,9 +22,14 @@ import { ANALYSIS_MODES } from '@/lib/constants';
 import Link from 'next/link';
 import { Footer } from '@/components/layout/footer';
 import { Header } from '@/components/layout/header';
+import { isSaaSMode } from '@/lib/config/app-mode';
 
 export default function Home() {
   const [githubUrl, setGithubUrl] = useState('');
+  const primaryHref = isSaaSMode() ? '/auth/signup' : '/analyze';
+  const primaryLabel = isSaaSMode() ? 'Get Started' : 'Analyze Repository';
+  const secondaryHref = isSaaSMode() ? '/auth/signin' : '/analyze';
+  const secondaryLabel = isSaaSMode() ? 'Sign In To Analyze' : 'Upload Files';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -61,19 +66,19 @@ export default function Home() {
                   className="pl-10 h-12 text-base"
                 />
               </div>
-              <Link href="/analyze">
+              <Link href={primaryHref}>
                 <Button size="lg" className="h-12 px-8 bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700">
-                  Analyze Repository
+                  {primaryLabel}
                   <ArrowRight className="ml-2 w-4 h-4" />
                 </Button>
               </Link>
             </div>
             <div className="flex items-center justify-center gap-4 text-sm text-gray-500">
               <span>or</span>
-              <Link href="/analyze">
+              <Link href={secondaryHref}>
                 <Button variant="outline" size="sm">
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload Files
+                  {secondaryLabel}
                 </Button>
               </Link>
             </div>

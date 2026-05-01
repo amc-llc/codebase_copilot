@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { AnalysisOrchestrator } from '@/lib/analyzer/analysis-orchestrator';
 import { AnalysisRequest } from '@/types';
+import { isSaaSMode } from '@/lib/config/app-mode';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,6 +9,13 @@ const orchestrator = new AnalysisOrchestrator();
 
 export async function POST(request: Request) {
   try {
+    if (isSaaSMode()) {
+      return NextResponse.json(
+        { error: 'Analysis is gated behind authentication in SaaS mode.' },
+        { status: 401 }
+      );
+    }
+
     const body = (await request.json()) as AnalysisRequest;
 
     if (!body?.provider?.apiKey) {

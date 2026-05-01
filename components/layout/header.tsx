@@ -39,7 +39,7 @@ export function Header({ showSettings = true, showBadge = true }: HeaderProps) {
               </Link>
             </>
           )}
-          {showSettings && (
+          {showSettings && !saasMode && (
             <Link href="/settings">
               <Button variant="ghost" size="sm">Settings</Button>
             </Link>

@@ -20,6 +20,7 @@ export default function ContactPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const supportHref = isSaaSMode() ? '/auth/signin?next=/support' : '/support';
 
   // Redirect to 404 if in OSS mode
   useEffect(() => {
@@ -100,7 +101,7 @@ export default function ContactPage() {
               <CardDescription>Get help with technical issues or questions</CardDescription>
             </CardHeader>
             <CardContent>
-              <Link href="/support">
+              <Link href={supportHref}>
                 <Button className="w-full">Open Support Ticket</Button>
               </Link>
             </CardContent>
