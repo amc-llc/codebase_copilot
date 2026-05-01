@@ -1,5 +1,6 @@
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
+import { listProviderModels, resolveProviderModel } from './provider-models';
 
 export class IBMProvider extends BaseAIProvider {
   constructor(config: AIProviderConfig) {
@@ -8,6 +9,7 @@ export class IBMProvider extends BaseAIProvider {
 
   async chat(messages: AIMessage[]): Promise<AIResponse> {
     try {
+      const model = await resolveProviderModel(this.config);
       // IBM watsonx.ai API integration
       // This is a placeholder implementation that can be configured with actual IBM credentials
       const response = await fetch('https://us-south.ml.cloud.ibm.com/ml/v1/text/generation?version=2023-05-29', {
@@ -17,7 +19,7 @@ export class IBMProvider extends BaseAIProvider {
           'Authorization': `Bearer ${this.config.apiKey}`,
         },
         body: JSON.stringify({
-          model_id: this.config.model || 'ibm/granite-13b-chat-v2',
+          model_id: model,
           input: this.formatMessagesForIBM(messages),
           parameters: {
             temperature: this.config.temperature || 0.7,
@@ -39,7 +41,7 @@ export class IBMProvider extends BaseAIProvider {
           completionTokens: data.results?.[0]?.generated_token_count || 0,
           totalTokens: (data.results?.[0]?.input_token_count || 0) + (data.results?.[0]?.generated_token_count || 0),
         },
-        model: this.config.model || 'ibm/granite-13b-chat-v2',
+        model,
       };
     } catch (error: any) {
       throw new Error(`IBM watsonx.ai API error: ${error.message}`);
@@ -63,22 +65,9 @@ export class IBMProvider extends BaseAIProvider {
 
   async validateApiKey(): Promise<boolean> {
     try {
-      const response = await fetch('https://us-south.ml.cloud.ibm.com/ml/v1/text/generation?version=2023-05-29', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-        body: JSON.stringify({
-          model_id: 'ibm/granite-13b-chat-v2',
-          input: 'Hi',
-          parameters: {
-            max_new_tokens: 10,
-          },
-        }),
-      });
-      return response.ok;
-    } catch (error) {
+      const models = await listProviderModels(this.config.provider, this.config.apiKey);
+      return models.length > 0;
+    } catch {
       return false;
     }
   }

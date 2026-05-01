@@ -60,7 +60,7 @@ export default function Home() {
                 <GitBranch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <Input
                   type="url"
-                  placeholder="https://github.com/username/repository"
+                  placeholder="https://github.com/owner/repo or https://gitlab.com/group/project"
                   value={githubUrl}
                   onChange={(e) => setGithubUrl(e.target.value)}
                   className="pl-10 h-12 text-base"

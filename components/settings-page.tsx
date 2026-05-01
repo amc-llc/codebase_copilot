@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Save, Key, User, Bell, Shield } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
 import { AIProvider } from '@/types';
-import { getAvailableModels, getProviderDisplayName } from '@/lib/ai/provider-metadata';
+import { getProviderDisplayName } from '@/lib/ai/provider-metadata';
 import { Footer } from '@/components/layout/footer';
 import { Header } from '@/components/layout/header';
 
@@ -29,6 +29,70 @@ export function SettingsPage() {
   const [model, setModel] = useState(storedConfig?.model || '');
   const [saved, setSaved] = useState(false);
   const [hasApiKey, setHasApiKey] = useState(Boolean(storedConfig?.apiKey));
+  const [savedProvider, setSavedProvider] = useState<AIProvider>(storedConfig?.provider || 'ibm');
+  const [savedApiKey, setSavedApiKey] = useState(storedConfig?.apiKey || '');
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(false);
+  const [modelsError, setModelsError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!savedApiKey.trim()) {
+      setAvailableModels([]);
+      setModelsError(null);
+      setIsLoadingModels(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadModels = async () => {
+      setIsLoadingModels(true);
+      setModelsError(null);
+
+      try {
+        const response = await fetch('/api/provider-models', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            provider: savedProvider,
+            apiKey: savedApiKey,
+          }),
+        });
+
+        const payload = (await response.json()) as { models?: string[]; error?: string };
+        if (!response.ok || payload.error) {
+          throw new Error(payload.error || 'Failed to load models.');
+        }
+
+        if (cancelled) {
+          return;
+        }
+
+        const models = payload.models || [];
+        setAvailableModels(models);
+        setModel((currentModel) => (currentModel && !models.includes(currentModel) ? '' : currentModel));
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setAvailableModels([]);
+        setModelsError(error instanceof Error ? error.message : 'Failed to load models.');
+      } finally {
+        if (!cancelled) {
+          setIsLoadingModels(false);
+        }
+      }
+    };
+
+    void loadModels();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [savedApiKey, savedProvider]);
 
   const handleSave = () => {
     storage.saveProviderConfig({
@@ -39,11 +103,11 @@ export function SettingsPage() {
       maxTokens: 4000,
     });
     setHasApiKey(!!apiKey);
+    setSavedProvider(provider);
+    setSavedApiKey(apiKey);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
-
-  const availableModels = hasApiKey ? getAvailableModels(provider) : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -100,10 +164,10 @@ export function SettingsPage() {
                         </div>
                       </SelectItem>
                       <SelectItem value="openai" className="h-12 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <span>OpenAI GPT-4</span>
+                        <span>OpenAI</span>
                       </SelectItem>
                       <SelectItem value="anthropic" className="h-12 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <span>Anthropic Claude</span>
+                        <span>Anthropic</span>
                       </SelectItem>
                       <SelectItem value="google" className="h-12 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700">
                         <span>Google AI</span>
@@ -120,46 +184,61 @@ export function SettingsPage() {
 
                 <div className="space-y-2">
                   <label className="text-sm font-medium">API Key</label>
-                  <Input
-                    type="password"
-                    placeholder="Enter your API key"
-                    value={apiKey}
-                    onChange={(event) => setApiKey(event.target.value)}
-                  />
+                    <Input
+                      type="password"
+                      placeholder="Enter your API key"
+                      value={apiKey}
+                      onChange={(event) => {
+                        setApiKey(event.target.value);
+                        setModelsError(null);
+                      }}
+                    />
                   <p className="text-xs text-gray-500">
                     Get your API key from the provider&apos;s dashboard
                   </p>
                 </div>
 
-                {hasApiKey && availableModels.length > 0 && (
+                {hasApiKey && (
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Model (Optional)</label>
-                    <Select value={model} onValueChange={setModel}>
-                      <SelectTrigger className="h-12">
-                        <SelectValue placeholder="Select a model or use default" />
-                      </SelectTrigger>
-                      <SelectContent className="z-50 max-h-[300px] overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg">
-                        {availableModels.map((availableModel) => (
-                          <SelectItem
-                            key={availableModel}
-                            value={availableModel}
-                            className="h-10 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                          >
-                            {availableModel}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-gray-500">
-                      Leave empty to use the default model for this provider
-                    </p>
+                    {isLoadingModels ? (
+                      <div className="rounded-lg border border-gray-200 dark:border-gray-700 px-4 py-3 text-sm text-gray-500 dark:text-gray-400">
+                        Loading models from the provider API...
+                      </div>
+                    ) : availableModels.length > 0 ? (
+                      <>
+                        <Select value={model} onValueChange={setModel}>
+                          <SelectTrigger className="h-12">
+                            <SelectValue placeholder="Select a model or use the provider default" />
+                          </SelectTrigger>
+                          <SelectContent className="z-50 max-h-[300px] overflow-y-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 shadow-lg">
+                            {availableModels.map((availableModel) => (
+                              <SelectItem
+                                key={availableModel}
+                                value={availableModel}
+                                className="h-10 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                              >
+                                {availableModel}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <p className="text-xs text-gray-500">
+                          Leave empty to let the server use the first model returned by the provider API.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-800 dark:bg-amber-900/20 dark:text-amber-200">
+                        {modelsError || 'No models were returned for this API key yet.'}
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {!hasApiKey && (
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      Save your API key first to see available models for this provider.
+                      Save your API key first to load models directly from the provider API.
                     </p>
                   </div>
                 )}

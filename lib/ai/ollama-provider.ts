@@ -1,5 +1,6 @@
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
+import { listProviderModels, resolveProviderModel } from './provider-models';
 
 export class OllamaProvider extends BaseAIProvider {
   constructor(config: AIProviderConfig) {
@@ -8,6 +9,7 @@ export class OllamaProvider extends BaseAIProvider {
 
   async chat(messages: AIMessage[]): Promise<AIResponse> {
     try {
+      const model = await resolveProviderModel(this.config);
       // Ollama Cloud API integration
       const response = await fetch('https://api.ollama.cloud/v1/chat/completions', {
         method: 'POST',
@@ -16,7 +18,7 @@ export class OllamaProvider extends BaseAIProvider {
           'Authorization': `Bearer ${this.config.apiKey}`,
         },
         body: JSON.stringify({
-          model: this.config.model || 'llama2',
+          model,
           messages: messages.map(msg => ({
             role: msg.role,
             content: msg.content,
@@ -44,7 +46,7 @@ export class OllamaProvider extends BaseAIProvider {
           completionTokens: data.usage.completion_tokens || 0,
           totalTokens: data.usage.total_tokens || 0,
         } : undefined,
-        model: data.model || this.config.model || 'llama2',
+        model: data.model || model,
       };
     } catch (error: any) {
       throw new Error(`Ollama Cloud API error: ${error.message}`);
@@ -53,13 +55,9 @@ export class OllamaProvider extends BaseAIProvider {
 
   async validateApiKey(): Promise<boolean> {
     try {
-      const response = await fetch('https://api.ollama.cloud/v1/models', {
-        headers: {
-          'Authorization': `Bearer ${this.config.apiKey}`,
-        },
-      });
-      return response.ok;
-    } catch (error) {
+      const models = await listProviderModels(this.config.provider, this.config.apiKey);
+      return models.length > 0;
+    } catch {
       return false;
     }
   }

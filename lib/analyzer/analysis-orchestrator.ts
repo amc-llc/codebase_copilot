@@ -7,6 +7,7 @@ import { CodebaseParser, CodebaseStatistics } from './codebase-parser';
 import { ArchitectureAnalyzer } from './architecture-analyzer';
 import { TestGenerator } from './test-generator';
 import { RefactorAnalyzer } from './refactor-analyzer';
+import { loadRepositoryFromUrl } from './repository-loader';
 import { AIProviderFactory } from '@/lib/ai/provider-factory';
 import {
   AIProviderConfig,
@@ -337,7 +338,12 @@ Create sections for README, architecture, setup, and contributing.`;
 
   private async loadFiles(source: CodebaseSource): Promise<FileNode[]> {
     if (source.type === 'github') {
-      throw new Error('GitHub repository analysis is not implemented yet. Upload files to analyze a codebase today.');
+      if (!source.url) {
+        throw new Error('A public repository URL is required for repository analysis.');
+      }
+
+      const repositoryFiles = await loadRepositoryFromUrl(source.url, source.branch);
+      return repositoryFiles.map((file) => this.toFileNode(file));
     }
 
     const uploadedFiles = source.files || [];

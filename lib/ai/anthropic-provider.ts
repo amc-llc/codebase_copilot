@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
+import { listProviderModels, resolveProviderModel } from './provider-models';
 
 export class AnthropicProvider extends BaseAIProvider {
   private client: Anthropic;
@@ -15,12 +16,13 @@ export class AnthropicProvider extends BaseAIProvider {
 
   async chat(messages: AIMessage[]): Promise<AIResponse> {
     try {
+      const model = await resolveProviderModel(this.config);
       // Anthropic requires system message separate from messages array
       const systemMessage = messages.find(m => m.role === 'system');
       const userMessages = messages.filter(m => m.role !== 'system');
 
       const response = await this.client.messages.create({
-        model: this.config.model || 'claude-3-5-sonnet-20241022',
+        model,
         max_tokens: this.config.maxTokens || 4000,
         temperature: this.config.temperature || 0.7,
         system: systemMessage?.content || this.getSystemPrompt(),
@@ -51,13 +53,8 @@ export class AnthropicProvider extends BaseAIProvider {
 
   async validateApiKey(): Promise<boolean> {
     try {
-      // Try a minimal request to validate the key
-      await this.client.messages.create({
-        model: 'claude-3-5-sonnet-20241022',
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'Hi' }],
-      });
-      return true;
+      const models = await listProviderModels(this.config.provider, this.config.apiKey);
+      return models.length > 0;
     } catch {
       return false;
     }

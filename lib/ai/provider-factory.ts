@@ -8,7 +8,6 @@ import { GoogleProvider } from './google-provider';
 import { IBMProvider } from './ibm-provider';
 import { OllamaProvider } from './ollama-provider';
 import {
-  getAvailableModels,
   getDefaultProviderConfig,
   getProviderDisplayName,
 } from './provider-metadata';
@@ -37,10 +36,6 @@ export class AIProviderFactory {
 
   static getProviderDisplayName(provider: AIProvider): string {
     return getProviderDisplayName(provider);
-  }
-
-  static getAvailableModels(provider: AIProvider): string[] {
-    return getAvailableModels(provider);
   }
 }
 

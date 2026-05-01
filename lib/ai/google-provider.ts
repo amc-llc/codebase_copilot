@@ -1,6 +1,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
+import { listProviderModels, resolveProviderModel } from './provider-models';
 
 export class GoogleProvider extends BaseAIProvider {
   private client: GoogleGenerativeAI;
@@ -12,8 +13,9 @@ export class GoogleProvider extends BaseAIProvider {
 
   async chat(messages: AIMessage[]): Promise<AIResponse> {
     try {
+      const modelName = await resolveProviderModel(this.config);
       const model = this.client.getGenerativeModel({
-        model: this.config.model || 'gemini-pro',
+        model: modelName,
       });
 
       // Combine system message with first user message for Google
@@ -53,7 +55,7 @@ export class GoogleProvider extends BaseAIProvider {
           completionTokens: 0,
           totalTokens: 0,
         },
-        model: this.config.model || 'gemini-pro',
+        model: modelName,
       };
     } catch (error: any) {
       throw new Error(`Google AI API error: ${error.message}`);
@@ -62,9 +64,8 @@ export class GoogleProvider extends BaseAIProvider {
 
   async validateApiKey(): Promise<boolean> {
     try {
-      const model = this.client.getGenerativeModel({ model: 'gemini-pro' });
-      await model.generateContent('Hi');
-      return true;
+      const models = await listProviderModels(this.config.provider, this.config.apiKey);
+      return models.length > 0;
     } catch {
       return false;
     }

@@ -1,6 +1,7 @@
 import OpenAI from 'openai';
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
+import { listProviderModels, resolveProviderModel } from './provider-models';
 
 export class OpenAIProvider extends BaseAIProvider {
   private client: OpenAI;
@@ -15,8 +16,9 @@ export class OpenAIProvider extends BaseAIProvider {
 
   async chat(messages: AIMessage[]): Promise<AIResponse> {
     try {
+      const model = await resolveProviderModel(this.config);
       const response = await this.client.chat.completions.create({
-        model: this.config.model || 'gpt-4-turbo-preview',
+        model,
         messages: messages.map(msg => ({
           role: msg.role,
           content: msg.content,
@@ -46,8 +48,8 @@ export class OpenAIProvider extends BaseAIProvider {
 
   async validateApiKey(): Promise<boolean> {
     try {
-      await this.client.models.list();
-      return true;
+      const models = await listProviderModels(this.config.provider, this.config.apiKey);
+      return models.length > 0;
     } catch {
       return false;
     }

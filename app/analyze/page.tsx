@@ -29,7 +29,7 @@ export default function AnalyzePage() {
 
   const [sourceType, setSourceType] = useState<'github' | 'upload'>('github');
   const [githubUrl, setGithubUrl] = useState('');
-  const [branch, setBranch] = useState('main');
+  const [branch, setBranch] = useState('');
   const [files, setFiles] = useState<File[]>([]);
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('explain');
   const [explanationLevel, setExplanationLevel] = useState<ExplanationLevel>('intermediate');
@@ -72,28 +72,29 @@ export default function AnalyzePage() {
       return;
     }
 
-    if (sourceType === 'github') {
-      const message = 'GitHub repository analysis is not wired yet. Upload files to analyze a project right now.';
-      setError(message);
-      setGlobalError(message);
-      return;
-    }
-
     setIsAnalyzing(true);
     setGlobalAnalyzing(true);
 
     try {
-      const uploadedFiles = await serializeFiles(files);
+      const source =
+        sourceType === 'github'
+          ? {
+              type: 'github' as const,
+              url: githubUrl.trim(),
+              branch: branch.trim() || undefined,
+            }
+          : {
+              type: 'upload' as const,
+              files: await serializeFiles(files),
+            };
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          source: {
-            type: 'upload',
-            files: uploadedFiles,
-          },
+          source,
           mode: analysisMode,
           explanationLevel,
           provider: providerConfig,
@@ -132,7 +133,7 @@ export default function AnalyzePage() {
               Analyze Your Codebase
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300">
-              Upload your code or connect a GitHub repository to get instant insights
+              Upload your code or analyze a public repository URL to get instant insights
             </p>
           </div>
 
@@ -148,7 +149,7 @@ export default function AnalyzePage() {
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="github" className="flex items-center gap-2">
                     <GitBranch className="w-4 h-4" />
-                    GitHub Repository
+                    Repository URL
                   </TabsTrigger>
                   <TabsTrigger value="upload" className="flex items-center gap-2">
                     <Upload className="w-4 h-4" />
@@ -162,13 +163,13 @@ export default function AnalyzePage() {
                     <Input
                       id="github-url"
                       type="url"
-                      placeholder="https://github.com/username/repository"
+                      placeholder="https://github.com/owner/repo or https://gitlab.com/group/project"
                       value={githubUrl}
                       onChange={(event) => setGithubUrl(event.target.value)}
                       className="h-12"
                     />
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      GitHub repository import is planned, but file upload is the working path right now.
+                      Supports public GitHub and GitLab repositories in OSS mode.
                     </p>
                   </div>
 
@@ -177,7 +178,7 @@ export default function AnalyzePage() {
                     <Input
                       id="branch"
                       type="text"
-                      placeholder="main"
+                      placeholder="Leave blank to use the default branch"
                       value={branch}
                       onChange={(event) => setBranch(event.target.value)}
                       className="h-12"
