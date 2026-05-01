@@ -3,7 +3,7 @@
 
 export type AppMode = 'oss' | 'saas';
 
-export const APP_MODE: AppMode = (process.env.NEXT_PUBLIC_APP_MODE as AppMode) || 'oss';
+export const APP_MODE: AppMode = (process.env.NEXT_PUBLIC_APP_MODE as AppMode) || 'saas';
 
 export const isSaaSMode = () => APP_MODE === 'saas';
 export const isOSSMode = () => APP_MODE === 'oss';
@@ -138,9 +138,9 @@ export const pricing = {
 
 // Default admin account (SaaS mode only)
 export const defaultAdmin = {
-  email: 'support@cobraaisystems.com',
-  password: 'Donceo1975', // Will be hashed
-  name: 'Admin',
+  email: process.env.DEFAULT_ADMIN_EMAIL || 'support@cobraaisystems.com',
+  password: process.env.DEFAULT_ADMIN_PASSWORD || 'change-me-before-production',
+  name: process.env.DEFAULT_ADMIN_NAME || 'Admin',
   role: 'SUPER_ADMIN',
 };
 

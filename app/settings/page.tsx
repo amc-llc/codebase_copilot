@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -9,29 +9,26 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Save, Key, User, Bell, Shield } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
-import { AIProviderFactory } from '@/lib/ai/provider-factory';
 import { AIProvider } from '@/types';
-import Link from 'next/link';
+import { getAvailableModels, getProviderDisplayName } from '@/lib/ai/provider-metadata';
 import { Footer } from '@/components/layout/footer';
 import { Header } from '@/components/layout/header';
 
-export default function SettingsPage() {
-  const [provider, setProvider] = useState<AIProvider>('ibm');
-  const [apiKey, setApiKey] = useState('');
-  const [model, setModel] = useState('');
-  const [saved, setSaved] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(false);
+function getStoredProviderConfig() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
 
-  useEffect(() => {
-    // Load saved configuration
-    const config = storage.getProviderConfig();
-    if (config) {
-      setProvider(config.provider);
-      setApiKey(config.apiKey);
-      setModel(config.model || '');
-      setHasApiKey(!!config.apiKey);
-    }
-  }, []);
+  return storage.getProviderConfig();
+}
+
+export default function SettingsPage() {
+  const storedConfig = getStoredProviderConfig();
+  const [provider, setProvider] = useState<AIProvider>(storedConfig?.provider || 'ibm');
+  const [apiKey, setApiKey] = useState(storedConfig?.apiKey || '');
+  const [model, setModel] = useState(storedConfig?.model || '');
+  const [saved, setSaved] = useState(false);
+  const [hasApiKey, setHasApiKey] = useState(Boolean(storedConfig?.apiKey));
 
   const handleSave = () => {
     storage.saveProviderConfig({
@@ -46,7 +43,7 @@ export default function SettingsPage() {
     setTimeout(() => setSaved(false), 3000);
   };
 
-  const availableModels = hasApiKey ? AIProviderFactory.getAvailableModels(provider) : [];
+  const availableModels = hasApiKey ? getAvailableModels(provider) : [];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-cyan-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
@@ -87,7 +84,7 @@ export default function SettingsPage() {
               <CardHeader>
                 <CardTitle>AI Provider Configuration</CardTitle>
                 <CardDescription>
-                  Configure your AI provider API keys. Your keys are stored securely in your browser.
+                  Configure your AI provider API keys. They stay in your browser and are only sent when you run an analysis.
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
@@ -120,7 +117,7 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-gray-500">
-                    {AIProviderFactory.getProviderDisplayName(provider)}
+                    {getProviderDisplayName(provider)}
                   </p>
                 </div>
 
@@ -163,7 +160,7 @@ export default function SettingsPage() {
                 {!hasApiKey && (
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
-                      💡 Save your API key first to see available models for this provider
+                      Save your API key first to see available models for this provider.
                     </p>
                   </div>
                 )}
@@ -176,7 +173,7 @@ export default function SettingsPage() {
                   </Button>
                   {saved && (
                     <Badge variant="secondary" className="bg-green-100 text-green-800">
-                      ✓ Saved successfully
+                      Saved successfully
                     </Badge>
                   )}
                 </div>
@@ -191,7 +188,7 @@ export default function SettingsPage() {
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 hover:underline"
                     >
-                      → IBM watsonx.ai
+                      IBM watsonx.ai
                     </a>
                     <a
                       href="https://platform.openai.com/api-keys"
@@ -199,7 +196,7 @@ export default function SettingsPage() {
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 hover:underline"
                     >
-                      → OpenAI
+                      OpenAI
                     </a>
                     <a
                       href="https://console.anthropic.com/"
@@ -207,7 +204,7 @@ export default function SettingsPage() {
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 hover:underline"
                     >
-                      → Anthropic
+                      Anthropic
                     </a>
                     <a
                       href="https://makersuite.google.com/app/apikey"
@@ -215,7 +212,7 @@ export default function SettingsPage() {
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 hover:underline"
                     >
-                      → Google AI
+                      Google AI
                     </a>
                     <a
                       href="https://ollama.com/cloud"
@@ -223,7 +220,7 @@ export default function SettingsPage() {
                       rel="noopener noreferrer"
                       className="text-sm text-blue-600 hover:underline"
                     >
-                      → Ollama Cloud
+                      Ollama Cloud
                     </a>
                   </div>
                 </div>
@@ -272,8 +269,8 @@ export default function SettingsPage() {
                 <div>
                   <h4 className="font-medium mb-2">Data Storage</h4>
                   <p className="text-sm text-gray-500 mb-4">
-                    Your API keys are stored locally in your browser using encrypted storage.
-                    They are never sent to our servers.
+                    Your API keys are stored locally in your browser using lightweight obfuscation.
+                    They are only included in analysis requests that you explicitly start.
                   </p>
                   <Button
                     variant="destructive"

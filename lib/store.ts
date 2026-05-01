@@ -4,9 +4,7 @@ import {
   AppState, 
   AIProviderConfig, 
   UserPreferences, 
-  AnalysisResult,
-  AIProvider,
-  ExplanationLevel 
+  AnalysisResult
 } from '@/types';
 
 interface StoreState extends AppState {

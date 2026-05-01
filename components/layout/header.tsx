@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Sparkles } from 'lucide-react';
 import Link from 'next/link';
+import { isSaaSMode } from '@/lib/config/app-mode';
 
 interface HeaderProps {
   showSettings?: boolean;
@@ -10,6 +11,8 @@ interface HeaderProps {
 }
 
 export function Header({ showSettings = true, showBadge = true }: HeaderProps) {
+  const saasMode = isSaaSMode();
+  
   return (
     <header className="border-b bg-white/80 backdrop-blur-sm dark:bg-gray-900/80 sticky top-0 z-50">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -23,6 +26,19 @@ export function Header({ showSettings = true, showBadge = true }: HeaderProps) {
           </div>
         </Link>
         <div className="flex items-center gap-4">
+          {saasMode && (
+            <>
+              <Link href="/pricing">
+                <Button variant="ghost" size="sm">Pricing</Button>
+              </Link>
+              <Link href="/auth/signin">
+                <Button variant="ghost" size="sm">Sign In</Button>
+              </Link>
+              <Link href="/auth/signup">
+                <Button size="sm">Get Started</Button>
+              </Link>
+            </>
+          )}
           {showSettings && (
             <Link href="/settings">
               <Button variant="ghost" size="sm">Settings</Button>

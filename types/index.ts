@@ -20,10 +20,18 @@ export interface AIProviderConfig {
   maxTokens?: number;
 }
 
+export interface UploadedCodeFile {
+  path: string;
+  name: string;
+  content: string;
+  size: number;
+  lines: number;
+}
+
 export interface CodebaseSource {
   type: 'github' | 'upload';
   url?: string;
-  files?: File[];
+  files?: UploadedCodeFile[];
   branch?: string;
 }
 
@@ -64,7 +72,7 @@ export interface DependencyGraphNode {
   id: string;
   label: string;
   type: 'file' | 'external' | 'module';
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface DependencyGraphEdge {
@@ -195,8 +203,8 @@ export interface GeneratedTest {
 
 export interface TestCase {
   name: string;
-  input: any;
-  expectedOutput: any;
+  input: unknown;
+  expectedOutput: unknown;
   description: string;
 }
 

@@ -6,7 +6,8 @@ const STORAGE_KEYS = {
   ANALYSIS_HISTORY: 'codebase_copilot_history',
 } as const;
 
-// Simple encryption for API keys (browser-side only)
+// Lightweight obfuscation for API keys stored in browser storage.
+// This is UX-focused, not a substitute for secure server-side secret storage.
 const encryptKey = (key: string): string => {
   return btoa(key);
 };

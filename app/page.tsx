@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -15,7 +15,8 @@ import {
   CheckCircle2,
   ArrowRight,
   FileCode,
-  Zap
+  Zap,
+  type LucideIcon,
 } from 'lucide-react';
 import { ANALYSIS_MODES } from '@/lib/constants';
 import Link from 'next/link';
@@ -113,7 +114,7 @@ export default function Home() {
 
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
           {Object.entries(ANALYSIS_MODES).map(([key, mode]) => {
-            const icons: Record<string, any> = {
+            const icons: Record<string, LucideIcon> = {
               explain: BookOpen,
               onboard: GitBranch,
               document: FileCode,

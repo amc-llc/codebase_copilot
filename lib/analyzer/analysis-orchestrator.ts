@@ -1,52 +1,63 @@
 /**
  * Analysis Orchestrator
- * Coordinates all analysis components and AI providers
+ * Coordinates parsing, heuristics, and optional AI-assisted outputs.
  */
 
-import { CodebaseParser } from './codebase-parser';
+import { CodebaseParser, CodebaseStatistics } from './codebase-parser';
 import { ArchitectureAnalyzer } from './architecture-analyzer';
+import { TestGenerator } from './test-generator';
+import { RefactorAnalyzer } from './refactor-analyzer';
 import { AIProviderFactory } from '@/lib/ai/provider-factory';
 import {
-  FileNode,
+  AIProviderConfig,
   AnalysisRequest,
   AnalysisResult,
   CodeAnalysis,
-  Explanation,
-  OnboardingGuide,
-  Documentation,
-  TestSuite,
-  RefactorSuggestion,
-  ProductionReadinessReport,
-  ExplanationLevel,
+  CodeDefinition,
   CodebaseMetadata,
+  CodebaseSource,
+  DependencyGraph,
+  DependencyNode,
+  Documentation,
+  Explanation,
+  ExplanationLevel,
+  FileNode,
+  KeyFile,
+  LanguageStats,
+  OnboardingGuide,
+  ProductionReadinessReport,
+  RefactorSuggestion,
+  Risk,
+  TestSuite,
+  UploadedCodeFile,
 } from '@/types';
+
+const PROJECT_NAME_FALLBACK = 'Uploaded Codebase';
 
 export class AnalysisOrchestrator {
   private parser: CodebaseParser;
   private architectureAnalyzer: ArchitectureAnalyzer;
+  private testGenerator: TestGenerator;
+  private refactorAnalyzer: RefactorAnalyzer;
 
   constructor() {
     this.parser = new CodebaseParser();
     this.architectureAnalyzer = new ArchitectureAnalyzer();
+    this.testGenerator = new TestGenerator();
+    this.refactorAnalyzer = new RefactorAnalyzer();
   }
 
-  /**
-   * Main analysis entry point
-   */
   async analyze(request: AnalysisRequest): Promise<AnalysisResult> {
-    // Step 1: Parse codebase
     const files = await this.loadFiles(request.source);
     const { definitions, dependencies, statistics } = await this.parser.parseCodebase(files);
 
-    // Step 2: Analyze architecture
     const frameworks = this.architectureAnalyzer.detectFrameworks(files);
     const entryPoints = this.architectureAnalyzer.identifyEntryPoints(files);
-    
     const metadata: CodebaseMetadata = {
       name: this.extractProjectName(files),
       totalFiles: statistics.totalFiles,
       totalLines: statistics.totalLines,
-      languages: this.convertToLanguageStats(statistics.filesByLanguage, statistics.totalFiles),
+      languages: this.convertToLanguageStats(statistics),
       frameworks,
       dependencies: await this.extractDependencies(files),
       entryPoints,
@@ -58,7 +69,6 @@ export class AnalysisOrchestrator {
       metadata
     );
 
-    // Step 3: Create base analysis
     const analysis: CodeAnalysis = {
       id: this.generateId(),
       timestamp: new Date(),
@@ -66,13 +76,12 @@ export class AnalysisOrchestrator {
       metadata,
       architecture,
       dependencies: this.convertDependencyGraph(dependencies),
-      summary: await this.generateSummary(metadata, architecture, request.provider),
-      keyFiles: await this.identifyKeyFiles(files, definitions),
+      summary: this.generateSummary(metadata, architecture),
+      keyFiles: this.identifyKeyFiles(files, definitions),
       complexityScore: this.calculateComplexity(statistics, dependencies),
-      risks: await this.identifyRisks(files, statistics),
+      risks: this.identifyRisks(files, statistics),
     };
 
-    // Step 4: Generate mode-specific outputs
     const result: AnalysisResult = { analysis };
 
     switch (request.mode) {
@@ -83,23 +92,18 @@ export class AnalysisOrchestrator {
           request.provider
         );
         break;
-
       case 'onboard':
-        result.onboarding = await this.generateOnboarding(analysis, files, request.provider);
+        result.onboarding = await this.generateOnboarding(analysis, request.provider);
         break;
-
       case 'document':
-        result.documentation = await this.generateDocumentation(analysis, files, request.provider);
+        result.documentation = await this.generateDocumentation(analysis, request.provider);
         break;
-
       case 'test':
-        result.tests = await this.generateTests(analysis, files, definitions, request.provider);
+        result.tests = await this.generateTests(files, definitions, request.provider);
         break;
-
       case 'refactor':
-        result.refactorings = await this.generateRefactorings(analysis, files, request.provider);
+        result.refactorings = await this.generateRefactorings(files, definitions, request.provider);
         break;
-
       case 'production-ready':
         result.productionReadiness = await this.generateProductionReadiness(
           analysis,
@@ -113,90 +117,54 @@ export class AnalysisOrchestrator {
     return result;
   }
 
-  /**
-   * Generate multi-level explanation
-   */
   private async generateExplanation(
     analysis: CodeAnalysis,
     level: ExplanationLevel,
-    providerConfig: any
+    providerConfig: AIProviderConfig
   ): Promise<Explanation> {
     const provider = AIProviderFactory.createProvider(providerConfig);
-    
     const prompt = this.buildExplanationPrompt(analysis, level);
-    const messages = [
-      { role: 'user' as const, content: prompt }
-    ];
-    const response = await provider.chat(messages);
+    const response = await provider.chat([{ role: 'user', content: prompt }]);
 
     return this.parseExplanationResponse(response.content, level);
   }
 
-  /**
-   * Build explanation prompt based on level
-   */
   private buildExplanationPrompt(analysis: CodeAnalysis, level: ExplanationLevel): string {
-    const baseContext = `
-Codebase: ${analysis.metadata.name}
-Architecture: ${analysis.architecture.type}
-Languages: ${analysis.metadata.languages.map(l => l.language).join(', ')}
-Frameworks: ${analysis.metadata.frameworks.join(', ')}
-Total Files: ${analysis.metadata.totalFiles}
-Total Lines: ${analysis.metadata.totalLines}
-`;
+    const context = [
+      `Codebase: ${analysis.metadata.name}`,
+      `Architecture: ${analysis.architecture.type}`,
+      `Languages: ${analysis.metadata.languages.map((language) => language.language).join(', ') || 'Unknown'}`,
+      `Frameworks: ${analysis.metadata.frameworks.join(', ') || 'None detected'}`,
+      `Entry points: ${analysis.metadata.entryPoints.join(', ') || 'None detected'}`,
+      `Summary: ${analysis.summary}`,
+    ].join('\n');
 
-    switch (level) {
-      case 'beginner':
-        return `${baseContext}
+    if (level === 'beginner') {
+      return `${context}
 
-Explain this codebase in simple terms that a beginner developer can understand.
-Use analogies and avoid technical jargon. Focus on:
-1. What the application does (in plain English)
-2. How the main parts work together (using simple analogies)
-3. Where to start reading the code
-4. What skills are needed to work on this
-
-Keep it friendly and encouraging.`;
-
-      case 'intermediate':
-        return `${baseContext}
-
-Provide a technical explanation of this codebase for an intermediate developer.
-Include:
-1. High-level architecture overview
-2. Key components and their responsibilities
-3. Data flow and main execution paths
-4. Important design patterns used
-5. Technology stack explanation
-6. How to navigate the codebase effectively
-
-Be clear and structured.`;
-
-      case 'senior':
-        return `${baseContext}
-
-Provide a concise, architecture-focused analysis for a senior engineer.
-Focus on:
-1. Architectural decisions and trade-offs
-2. System boundaries and integration points
-3. Scalability and performance considerations
-4. Technical debt and improvement opportunities
-5. Critical paths and potential bottlenecks
-
-Be direct and technical.`;
+Explain this codebase in beginner-friendly terms.
+Cover what it does, how the main parts fit together, where to start reading, and what a new developer should learn first.`;
     }
+
+    if (level === 'senior') {
+      return `${context}
+
+Provide a concise senior-level architecture review.
+Focus on system boundaries, trade-offs, critical paths, and likely technical debt.`;
+    }
+
+    return `${context}
+
+Provide an intermediate developer explanation of the codebase.
+Cover architecture, key modules, runtime flow, and how to navigate it effectively.`;
   }
 
-  /**
-   * Parse AI response into structured explanation
-   */
   private parseExplanationResponse(response: string, level: ExplanationLevel): Explanation {
-    // Simple parsing - in production, use more sophisticated parsing
-    const sections = response.split('\n\n');
-    
+    const sections = response.split('\n\n').filter(Boolean);
+
     return {
       level,
-      summary: sections[0] || response.substring(0, 200),
+      summary: sections[0] || response.slice(0, 240),
       details: response,
       codeExamples: [],
       diagrams: [],
@@ -204,305 +172,411 @@ Be direct and technical.`;
     };
   }
 
-  /**
-   * Extract next steps from response
-   */
   private extractNextSteps(response: string): string[] {
-    const steps: string[] = [];
-    const lines = response.split('\n');
-    
-    let inNextSteps = false;
-    for (const line of lines) {
-      if (line.toLowerCase().includes('next step') || line.toLowerCase().includes('getting started')) {
-        inNextSteps = true;
-        continue;
-      }
-      
-      if (inNextSteps && line.trim().match(/^[\d\-\*]/)) {
-        steps.push(line.trim().replace(/^[\d\-\*\.]\s*/, ''));
-      }
-    }
-    
-    return steps;
+    return response
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => /^[\d*-]/.test(line))
+      .map((line) => line.replace(/^[\d*.-]+\s*/, ''))
+      .slice(0, 5);
   }
 
-  /**
-   * Generate onboarding guide
-   */
   private async generateOnboarding(
     analysis: CodeAnalysis,
-    files: FileNode[],
-    providerConfig: any
+    providerConfig: AIProviderConfig
   ): Promise<OnboardingGuide> {
     const provider = AIProviderFactory.createProvider(providerConfig);
-    
-    const prompt = `
-Generate a comprehensive onboarding guide for this codebase:
+    const prompt = `Generate an onboarding guide for this codebase:
 
 ${JSON.stringify(analysis.metadata, null, 2)}
 
-Architecture: ${analysis.architecture.type}
-Key Files: ${analysis.keyFiles.map(f => f.path).join(', ')}
+Architecture: ${analysis.architecture.description}
+Key files: ${analysis.keyFiles.map((file) => file.path).join(', ')}
 
-Provide:
-1. Project overview (what it does, why it exists)
-2. Getting started steps (setup, installation, running)
-3. Architecture explanation
-4. Key files to read first and why
-5. Common pitfalls to avoid
-6. Suggested first tasks for new developers
-7. Learning path (ordered steps to understand the codebase)
+Return a practical guide with setup steps, common pitfalls, and a short learning path.`;
+    const response = await provider.chat([{ role: 'user', content: prompt }]);
 
-Format as a structured guide.`;
-
-    const messages = [
-      { role: 'user' as const, content: prompt }
-    ];
-    const response = await provider.chat(messages);
-
-    return this.parseOnboardingResponse(response.content, analysis);
-  }
-
-  /**
-   * Parse onboarding response
-   */
-  private parseOnboardingResponse(response: string, analysis: CodeAnalysis): OnboardingGuide {
     return {
-      overview: response.substring(0, 500),
-      gettingStarted: this.extractListItems(response, 'getting started'),
+      overview: response.content.slice(0, 600),
+      gettingStarted: this.extractBullets(response.content, ['setup', 'getting started']),
       keyFiles: analysis.keyFiles,
       architecture: analysis.architecture.description,
-      setupInstructions: this.extractListItems(response, 'setup'),
-      commonPitfalls: this.extractListItems(response, 'pitfall'),
-      suggestedTasks: this.extractListItems(response, 'task'),
-      learningPath: this.extractLearningPath(response),
+      setupInstructions: this.extractBullets(response.content, ['setup', 'install']),
+      commonPitfalls: this.extractBullets(response.content, ['pitfall', 'watch out']),
+      suggestedTasks: this.extractBullets(response.content, ['task', 'next']),
+      learningPath: this.buildLearningPath(analysis.keyFiles),
     };
   }
 
-  /**
-   * Extract list items from text
-   */
-  private extractListItems(text: string, keyword: string): string[] {
-    const items: string[] = [];
-    const lines = text.toLowerCase().split('\n');
-    
-    let inSection = false;
-    for (let i = 0; i < lines.length; i++) {
-      if (lines[i].includes(keyword)) {
-        inSection = true;
-        continue;
-      }
-      
-      if (inSection && lines[i].trim().match(/^[\d\-\*]/)) {
-        items.push(lines[i].trim().replace(/^[\d\-\*\.]\s*/, ''));
-      } else if (inSection && lines[i].trim() === '') {
-        break;
-      }
-    }
-    
-    return items;
-  }
-
-  /**
-   * Extract learning path
-   */
-  private extractLearningPath(text: string): any[] {
-    // Simplified - in production, use better parsing
-    return [
-      { order: 1, title: 'Understand the architecture', description: 'Review system design', files: [], estimatedTime: '1 hour' },
-      { order: 2, title: 'Explore key files', description: 'Read main components', files: [], estimatedTime: '2 hours' },
-      { order: 3, title: 'Run the application', description: 'Set up and test locally', files: [], estimatedTime: '1 hour' },
-    ];
-  }
-
-  /**
-   * Generate documentation
-   */
   private async generateDocumentation(
     analysis: CodeAnalysis,
-    files: FileNode[],
-    providerConfig: any
+    providerConfig: AIProviderConfig
   ): Promise<Documentation> {
     const provider = AIProviderFactory.createProvider(providerConfig);
-    
-    const prompt = `
-Generate comprehensive documentation for this codebase:
+    const prompt = `Generate documentation for this codebase:
 
 ${JSON.stringify(analysis.metadata, null, 2)}
 
-Create:
-1. README.md with project overview, setup, usage
-2. Architecture documentation
-3. API documentation (if applicable)
-4. Setup guide
-5. Contributing guide
-
-Make it professional and complete.`;
-
-    const messages = [
-      { role: 'user' as const, content: prompt }
-    ];
-    const response = await provider.chat(messages);
+Create sections for README, architecture, setup, and contributing.`;
+    const response = await provider.chat([{ role: 'user', content: prompt }]);
 
     return {
-      readme: this.extractSection(response.content, 'readme'),
-      apiDocs: this.extractSection(response.content, 'api'),
+      readme: this.extractSection(response.content, 'readme') || response.content,
       architectureDocs: this.extractSection(response.content, 'architecture'),
       setupGuide: this.extractSection(response.content, 'setup'),
       contributingGuide: this.extractSection(response.content, 'contributing'),
+      apiDocs: this.extractSection(response.content, 'api'),
     };
   }
 
-  /**
-   * Extract section from documentation
-   */
-  private extractSection(text: string, section: string): string {
+  private extractSection(text: string, sectionName: string): string {
     const lines = text.split('\n');
+    const collected: string[] = [];
     let inSection = false;
-    const sectionLines: string[] = [];
-    
+
     for (const line of lines) {
-      if (line.toLowerCase().includes(section)) {
+      const lowered = line.toLowerCase();
+      if (lowered.includes(sectionName)) {
         inSection = true;
         continue;
       }
-      
+
+      if (inSection && line.startsWith('#')) {
+        break;
+      }
+
       if (inSection) {
-        if (line.startsWith('#') && !line.toLowerCase().includes(section)) {
-          break;
-        }
-        sectionLines.push(line);
+        collected.push(line);
       }
     }
-    
-    return sectionLines.join('\n').trim();
+
+    return collected.join('\n').trim();
   }
 
-  /**
-   * Generate tests
-   */
   private async generateTests(
-    analysis: CodeAnalysis,
     files: FileNode[],
-    definitions: any[],
-    providerConfig: any
+    definitions: CodeDefinition[],
+    providerConfig: AIProviderConfig
   ): Promise<TestSuite> {
-    // Simplified implementation
-    return {
-      framework: 'jest',
-      tests: [],
-      coverage: { overall: 0, byFile: {}, uncoveredFiles: [] },
-      setupInstructions: ['npm install --save-dev jest', 'npm test'],
-    };
+    return this.testGenerator.generateTests(files, definitions, providerConfig);
   }
 
-  /**
-   * Generate refactoring suggestions
-   */
   private async generateRefactorings(
-    analysis: CodeAnalysis,
     files: FileNode[],
-    providerConfig: any
+    definitions: CodeDefinition[],
+    providerConfig: AIProviderConfig
   ): Promise<RefactorSuggestion[]> {
-    // Simplified implementation
-    return [];
+    return this.refactorAnalyzer.analyzeForRefactoring(files, definitions, providerConfig);
   }
 
-  /**
-   * Generate production readiness report
-   */
   private async generateProductionReadiness(
     analysis: CodeAnalysis,
     files: FileNode[],
-    definitions: any[],
-    providerConfig: any
+    definitions: CodeDefinition[],
+    providerConfig: AIProviderConfig
   ): Promise<ProductionReadinessReport> {
-    // Simplified implementation
+    const tests = await this.testGenerator.generateTests(files, definitions, providerConfig);
+    const refactorings = await this.refactorAnalyzer.analyzeForRefactoring(
+      files,
+      definitions,
+      providerConfig
+    );
+
+    const criticalIssues = refactorings.filter((item) => item.severity === 'critical').length;
+    const highIssues = refactorings.filter((item) => item.severity === 'high').length;
+    const score = Math.max(
+      0,
+      Math.round((tests.coverage.overall + (100 - criticalIssues * 20 - highIssues * 10)) / 2)
+    );
+
     return {
-      score: 75,
-      status: 'needs-work',
-      checklist: [],
+      score,
+      status: score >= 80 ? 'ready' : score >= 60 ? 'needs-work' : 'not-ready',
+      checklist: [
+        {
+          category: 'Testing',
+          item: 'Automated tests generated',
+          status: tests.tests.length > 0 ? 'complete' : 'incomplete',
+          priority: 'high',
+        },
+        {
+          category: 'Code Quality',
+          item: 'No critical refactoring issues',
+          status: criticalIssues === 0 ? 'complete' : 'incomplete',
+          priority: 'critical',
+        },
+        {
+          category: 'Security',
+          item: 'No detected secret-like strings in source files',
+          status: analysis.risks.some((risk) => risk.category === 'security') ? 'incomplete' : 'complete',
+          priority: 'critical',
+        },
+      ],
       codeQuality: {
-        maintainabilityIndex: 70,
-        cyclomaticComplexity: 15,
-        codeSmells: 5,
-        technicalDebt: '2 days',
-        testCoverage: 60,
+        maintainabilityIndex: Math.max(0, 100 - refactorings.length * 3),
+        cyclomaticComplexity: Math.round(analysis.complexityScore / 5),
+        codeSmells: refactorings.length,
+        technicalDebt: `${Math.max(1, Math.ceil(refactorings.length / 3))} day(s)`,
+        testCoverage: tests.coverage.overall,
       },
-      documentation: { readme: '' },
-      tests: { framework: 'jest', tests: [], coverage: { overall: 0, byFile: {}, uncoveredFiles: [] }, setupInstructions: [] },
-      improvements: [],
-      securityIssues: [],
-      performanceIssues: [],
-      deploymentChecklist: [],
+      documentation: {
+        readme: analysis.summary,
+      },
+      tests,
+      improvements: refactorings,
+      securityIssues: analysis.risks.filter((risk) => risk.category === 'security'),
+      performanceIssues: analysis.risks.filter((risk) => risk.category === 'performance'),
+      deploymentChecklist: [
+        'Add real authentication and authorization checks',
+        'Add environment validation for SaaS deployments',
+        'Run automated tests in CI',
+        'Configure observability and error tracking',
+      ],
     };
   }
 
-  // Helper methods
+  private async loadFiles(source: CodebaseSource): Promise<FileNode[]> {
+    if (source.type === 'github') {
+      throw new Error('GitHub repository analysis is not implemented yet. Upload files to analyze a codebase today.');
+    }
 
-  private async loadFiles(source: any): Promise<FileNode[]> {
-    // Simplified - in production, implement actual file loading
-    return [];
+    const uploadedFiles = source.files || [];
+    if (uploadedFiles.length === 0) {
+      throw new Error('No uploaded files were provided for analysis.');
+    }
+
+    return uploadedFiles.map((file) => this.toFileNode(file));
+  }
+
+  private toFileNode(file: UploadedCodeFile): FileNode {
+    const extensionIndex = file.name.lastIndexOf('.');
+    const extension = extensionIndex >= 0 ? file.name.slice(extensionIndex) : undefined;
+
+    return {
+      path: file.path,
+      name: file.name,
+      type: 'file',
+      extension,
+      size: file.size,
+      content: file.content,
+      lines: file.lines,
+    };
   }
 
   private extractProjectName(files: FileNode[]): string {
-    const packageJson = files.find(f => f.name === 'package.json');
-    if (packageJson?.content) {
-      try {
-        const pkg = JSON.parse(packageJson.content);
-        return pkg.name || 'Unknown Project';
-      } catch (e) {
-        return 'Unknown Project';
-      }
+    const packageJson = files.find((file) => file.name === 'package.json');
+    if (!packageJson?.content) {
+      return PROJECT_NAME_FALLBACK;
     }
-    return 'Unknown Project';
+
+    try {
+      const pkg = JSON.parse(packageJson.content) as { name?: string };
+      return pkg.name || PROJECT_NAME_FALLBACK;
+    } catch {
+      return PROJECT_NAME_FALLBACK;
+    }
   }
 
-  private convertToLanguageStats(filesByLanguage: Record<string, number>, totalFiles: number): any[] {
-    return Object.entries(filesByLanguage).map(([language, files]) => ({
-      language,
-      files,
-      lines: 0,
-      percentage: (files / totalFiles) * 100,
-    }));
+  private convertToLanguageStats(statistics: CodebaseStatistics): LanguageStats[] {
+    const totalFiles = statistics.totalFiles || 1;
+
+    return Object.entries(statistics.filesByLanguage)
+      .map(([language, fileCount]) => ({
+        language,
+        files: fileCount,
+        lines: 0,
+        percentage: Number(((fileCount / totalFiles) * 100).toFixed(1)),
+      }))
+      .sort((left, right) => right.files - left.files);
   }
 
   private async extractDependencies(files: FileNode[]): Promise<Record<string, string>> {
-    const packageJson = files.find(f => f.name === 'package.json');
-    if (packageJson?.content) {
-      try {
-        const pkg = JSON.parse(packageJson.content);
-        return pkg.dependencies || {};
-      } catch (e) {
-        return {};
+    const packageJson = files.find((file) => file.name === 'package.json');
+    if (!packageJson?.content) {
+      return {};
+    }
+
+    try {
+      const pkg = JSON.parse(packageJson.content) as {
+        dependencies?: Record<string, string>;
+      };
+      return pkg.dependencies || {};
+    } catch {
+      return {};
+    }
+  }
+
+  private convertDependencyGraph(graph: DependencyGraph): DependencyNode[] {
+    const nodeMap = new Map<string, DependencyNode>();
+
+    for (const node of graph.nodes) {
+      nodeMap.set(node.id, {
+        id: node.id,
+        name: node.label,
+        type: node.type === 'external' ? 'external' : 'internal',
+        dependencies: [],
+        dependents: [],
+      });
+    }
+
+    for (const edge of graph.edges) {
+      const source = nodeMap.get(edge.source);
+      const target = nodeMap.get(edge.target);
+      if (!source || !target) {
+        continue;
+      }
+
+      source.dependencies.push(target.id);
+      target.dependents.push(source.id);
+    }
+
+    return [...nodeMap.values()].sort((left, right) => right.dependents.length - left.dependents.length);
+  }
+
+  private generateSummary(metadata: CodebaseMetadata, architecture: CodeAnalysis['architecture']): string {
+    const frameworks = metadata.frameworks.length > 0 ? metadata.frameworks.join(', ') : 'no clear framework';
+    const languages = metadata.languages.map((language) => language.language).join(', ') || 'unknown languages';
+
+    return `${metadata.name} looks like a ${architecture.type} codebase built with ${frameworks}. It contains ${metadata.totalFiles} source files across ${languages}.`;
+  }
+
+  private identifyKeyFiles(files: FileNode[], definitions: CodeDefinition[]): KeyFile[] {
+    const definitionCounts = new Map<string, number>();
+    for (const definition of definitions) {
+      definitionCounts.set(
+        definition.filePath,
+        (definitionCounts.get(definition.filePath) || 0) + 1
+      );
+    }
+
+    const scoredFiles = files
+      .filter((file) => file.type === 'file')
+      .map((file) => {
+        const path = file.path.toLowerCase();
+        let score = definitionCounts.get(file.path) || 0;
+        let reason = 'Contains notable code definitions or project structure.';
+
+        if (path.endsWith('package.json')) {
+          score += 10;
+          reason = 'Defines the project package metadata, scripts, and dependencies.';
+        } else if (path.includes('app/layout') || path.includes('app/page')) {
+          score += 8;
+          reason = 'Acts as a top-level entry point for the application UI.';
+        } else if (path.includes('prisma/schema.prisma')) {
+          score += 8;
+          reason = 'Defines the database schema and core SaaS data model.';
+        } else if (path.includes('auth') || path.includes('settings')) {
+          score += 6;
+          reason = 'Touches a user-critical SaaS workflow.';
+        } else if (path.endsWith('next.config.ts')) {
+          score += 6;
+          reason = 'Controls build and runtime behavior for the app.';
+        }
+
+        return {
+          path: file.path,
+          score,
+          reason,
+          linesOfCode: file.lines || 0,
+        };
+      })
+      .sort((left, right) => right.score - left.score)
+      .slice(0, 8);
+
+    return scoredFiles.map((file, index) => ({
+      path: file.path,
+      importance: index < 2 ? 'critical' : index < 5 ? 'high' : 'medium',
+      reason: file.reason,
+      linesOfCode: file.linesOfCode,
+    }));
+  }
+
+  private calculateComplexity(statistics: CodebaseStatistics, dependencies: DependencyGraph): number {
+    const fileWeight = statistics.totalFiles * 0.6;
+    const lineWeight = statistics.totalLines * 0.0025;
+    const dependencyWeight = dependencies.edges.length * 0.8;
+    return Math.min(100, Math.round(fileWeight + lineWeight + dependencyWeight));
+  }
+
+  private identifyRisks(files: FileNode[], statistics: CodebaseStatistics): Risk[] {
+    const risks: Risk[] = [];
+    const secretPattern = /(api[_-]?key|secret|token|password)\s*[:=]\s*['"`][^'"`\n]{8,}['"`]/i;
+
+    for (const file of files) {
+      if (file.type !== 'file' || !file.content) {
+        continue;
+      }
+
+      if (secretPattern.test(file.content)) {
+        risks.push({
+          severity: 'high',
+          category: 'security',
+          description: 'Potential hardcoded credential or token found in source.',
+          location: file.path,
+          suggestion: 'Move secrets to environment variables or a secure secrets manager.',
+        });
+      }
+
+      if ((file.lines || 0) > 500) {
+        risks.push({
+          severity: 'medium',
+          category: 'maintainability',
+          description: `Large file detected (${file.lines} lines).`,
+          location: file.path,
+          suggestion: 'Split the file into smaller focused modules.',
+        });
       }
     }
-    return {};
+
+    const hasTests = files.some((file) =>
+      /\.(test|spec)\.(js|jsx|ts|tsx|py)$/.test(file.name)
+    );
+    if (!hasTests && statistics.totalFiles > 10) {
+      risks.push({
+        severity: 'medium',
+        category: 'complexity',
+        description: 'No automated test files were detected in the uploaded codebase.',
+        suggestion: 'Add unit and integration tests around critical workflows.',
+      });
+    }
+
+    return risks.slice(0, 10);
   }
 
-  private convertDependencyGraph(graph: any): any[] {
-    return [];
+  private extractBullets(text: string, keywords: string[]): string[] {
+    const lines = text.split('\n').map((line) => line.trim());
+    const keywordSet = keywords.map((keyword) => keyword.toLowerCase());
+    const items: string[] = [];
+    let inSection = false;
+
+    for (const line of lines) {
+      const lowered = line.toLowerCase();
+      if (keywordSet.some((keyword) => lowered.includes(keyword))) {
+        inSection = true;
+        continue;
+      }
+
+      if (inSection && /^[\d*-]/.test(line)) {
+        items.push(line.replace(/^[\d*.-]+\s*/, ''));
+      } else if (inSection && line === '') {
+        break;
+      }
+    }
+
+    return items.slice(0, 5);
   }
 
-  private async generateSummary(metadata: any, architecture: any, provider: any): Promise<string> {
-    return `${metadata.name} is a ${architecture.type} application built with ${metadata.frameworks.join(', ')}.`;
-  }
-
-  private async identifyKeyFiles(files: FileNode[], definitions: any[]): Promise<any[]> {
-    return [];
-  }
-
-  private calculateComplexity(statistics: any, dependencies: any): number {
-    return Math.min(100, statistics.totalFiles * 0.5 + statistics.totalLines * 0.001);
-  }
-
-  private async identifyRisks(files: FileNode[], statistics: any): Promise<any[]> {
-    return [];
+  private buildLearningPath(keyFiles: KeyFile[]) {
+    return keyFiles.slice(0, 3).map((file, index) => ({
+      order: index + 1,
+      title: `Read ${file.path.split('/').pop() || file.path}`,
+      description: file.reason,
+      files: [file.path],
+      estimatedTime: `${index + 1}0 minutes`,
+    }));
   }
 
   private generateId(): string {
-    return `analysis_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `analysis_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 }
-
-// Made with Bob

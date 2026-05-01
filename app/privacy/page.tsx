@@ -78,9 +78,9 @@ export default function PrivacyPage() {
               <div>
                 <h4 className="font-semibold text-gray-900 dark:text-white mb-2">3.1 OSS Mode</h4>
                 <ul className="list-disc list-inside space-y-2 ml-4">
-                  <li>API keys are stored encrypted in your browser's local storage</li>
-                  <li>No data is sent to our servers</li>
-                  <li>Code analysis happens directly between your browser and chosen AI provider</li>
+                  <li>API keys are stored in your browser using lightweight obfuscation</li>
+                  <li>Analysis requests run through the application server when you start a job</li>
+                  <li>Uploaded code is processed for the active analysis request and is not intended for long-term storage</li>
                 </ul>
               </div>
               <div>

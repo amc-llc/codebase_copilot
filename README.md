@@ -51,7 +51,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 4. Choose a model
 5. Start analyzing!
 
-**No environment variables needed!** The app works out of the box.
+For the SaaS variant, copy `.env.example` and provide the required values before running production-style flows.
 
 ## 📖 Usage
 
@@ -115,7 +115,7 @@ Export your analysis in multiple formats:
 
 ## 🤖 Supported AI Providers
 
-### IBM watsonx.ai (Default)
+### IBM watsonx.ai
 - Models: Granite 13B, Granite 20B, Llama 2 70B
 - Get API key: [IBM Cloud](https://cloud.ibm.com/)
 
@@ -139,7 +139,7 @@ Export your analysis in multiple formats:
 
 Built with modern technologies:
 
-- **Framework**: Next.js 14+ (App Router)
+- **Framework**: Next.js 16+ (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS + ShadCN UI
 - **AI Integration**: Multi-provider abstraction layer
