@@ -1,15 +1,41 @@
-import { PrismaClient } from '@prisma/client';
+// SaaS-only database configuration
+// This file is not used in OSS mode
 import { isSaaSMode } from '@/lib/config/app-mode';
+
+// Mock PrismaClient type for OSS mode
+type PrismaClient = any;
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
+// Create a mock prisma client for OSS mode
+const createMockPrisma = (): any => ({
+  $queryRaw: async () => { throw new Error('Database not available in OSS mode'); },
+  user: {
+    findUnique: async () => null,
+    create: async () => { throw new Error('Database not available in OSS mode'); },
+  },
+});
+
+// Only import PrismaClient in SaaS mode
+let PrismaClientClass: any;
+if (isSaaSMode()) {
+  try {
+    const prismaModule = require('@prisma/client');
+    PrismaClientClass = prismaModule.PrismaClient;
+  } catch (error) {
+    console.warn('Prisma client not available');
+  }
+}
+
 export const prisma =
   globalForPrisma.prisma ??
-  new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-  });
+  (PrismaClientClass
+    ? new PrismaClientClass({
+        log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+      })
+    : createMockPrisma());
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
