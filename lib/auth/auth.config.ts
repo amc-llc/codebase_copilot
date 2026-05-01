@@ -1,7 +1,8 @@
-import type { NextAuthConfig } from 'next-auth';
+// SaaS-only authentication configuration
+// This file is not used in OSS mode
 import { isSaaSMode } from '@/lib/config/app-mode';
 
-export const authConfig = {
+export const authConfig: any = {
   pages: {
     signIn: '/auth/signin',
     signOut: '/auth/signout',
@@ -10,7 +11,7 @@ export const authConfig = {
     newUser: '/onboarding',
   },
   callbacks: {
-    authorized({ auth, request: { nextUrl } }) {
+    authorized({ auth, request: { nextUrl } }: any) {
       const isLoggedIn = !!auth?.user;
       const isOnDashboard = nextUrl.pathname.startsWith('/dashboard');
       const isOnAdmin = nextUrl.pathname.startsWith('/admin');
@@ -42,7 +43,7 @@ export const authConfig = {
 
       return true;
     },
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user, trigger, session }: any) {
       if (user) {
         token.id = user.id;
         token.role = (user as any).role;
@@ -56,7 +57,7 @@ export const authConfig = {
 
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: any) {
       if (token && session.user) {
         session.user.id = token.id as string;
         (session.user as any).role = token.role;
@@ -70,6 +71,6 @@ export const authConfig = {
     strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
-} satisfies NextAuthConfig;
+};
 
 // Made with Bob
