@@ -3,7 +3,7 @@
 
 export type AppMode = 'oss' | 'saas';
 
-export const APP_MODE: AppMode = (process.env.NEXT_PUBLIC_APP_MODE as AppMode) || 'saas';
+export const APP_MODE: AppMode = (process.env.NEXT_PUBLIC_APP_MODE as AppMode) || 'oss';
 
 export const isSaaSMode = () => APP_MODE === 'saas';
 export const isOSSMode = () => APP_MODE === 'oss';

@@ -308,7 +308,7 @@ npm run dev
 ## 📝 Notes
 
 - **Default Admin**: configured via `DEFAULT_ADMIN_EMAIL` and `DEFAULT_ADMIN_PASSWORD`
-- **Default Mode**: SaaS (set `NEXT_PUBLIC_APP_MODE=oss` to force OSS mode)
+- **Default Mode**: OSS (set `NEXT_PUBLIC_APP_MODE=saas` for hosted SaaS deployments)
 - **SaaS Mode**: Requires database, auth, and Stripe setup
 - **AI Providers**: Users configure their own API keys
 - **Deployment**: Ready for Vercel with Neon + Upstash
