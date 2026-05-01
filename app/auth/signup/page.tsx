@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,11 +9,18 @@ import { Code2, Mail, Lock, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function SignUpPage() {
+const planNames: Record<string, string> = {
+  free: 'Free',
+  starter: 'Starter',
+  pro: 'Pro',
+  enterprise: 'Enterprise',
+};
+
+function SignUpPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const plan = searchParams.get('plan') || 'free';
-  
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -22,37 +29,28 @@ export default function SignUpPage() {
   });
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
+  const handleSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+
     if (formData.password !== formData.confirmPassword) {
       alert('Passwords do not match');
       return;
     }
-    
+
     setIsLoading(true);
-    
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Redirect to dashboard or payment
+
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+
     if (plan !== 'free') {
       router.push(`/checkout?plan=${plan}`);
-    } else {
-      router.push('/');
+      return;
     }
+
+    router.push('/');
   };
 
   const handleGithubSignUp = () => {
-    // GitHub OAuth would be implemented here
     console.log('GitHub sign up');
-  };
-
-  const planNames: Record<string, string> = {
-    free: 'Free',
-    starter: 'Starter',
-    pro: 'Pro',
-    enterprise: 'Enterprise',
   };
 
   return (
@@ -114,7 +112,7 @@ export default function SignUpPage() {
                     placeholder="John Doe"
                     className="pl-10"
                     value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    onChange={(event) => setFormData({ ...formData, name: event.target.value })}
                     required
                   />
                 </div>
@@ -130,7 +128,7 @@ export default function SignUpPage() {
                     placeholder="you@example.com"
                     className="pl-10"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    onChange={(event) => setFormData({ ...formData, email: event.target.value })}
                     required
                   />
                 </div>
@@ -143,10 +141,10 @@ export default function SignUpPage() {
                   <Input
                     id="password"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="********"
                     className="pl-10"
                     value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                    onChange={(event) => setFormData({ ...formData, password: event.target.value })}
                     required
                     minLength={8}
                   />
@@ -163,10 +161,12 @@ export default function SignUpPage() {
                   <Input
                     id="confirmPassword"
                     type="password"
-                    placeholder="••••••••"
+                    placeholder="********"
                     className="pl-10"
                     value={formData.confirmPassword}
-                    onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                    onChange={(event) =>
+                      setFormData({ ...formData, confirmPassword: event.target.value })
+                    }
                     required
                   />
                 </div>
@@ -182,7 +182,7 @@ export default function SignUpPage() {
             </form>
 
             <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-              Already have an account?{' '}
+              {"Already have an account? "}
               <Link href="/auth/signin" className="text-blue-600 hover:underline font-medium">
                 Sign in
               </Link>
@@ -191,7 +191,7 @@ export default function SignUpPage() {
         </Card>
 
         <p className="text-center text-xs text-gray-500 dark:text-gray-400 mt-6">
-          By signing up, you agree to our{' '}
+          {"By signing up, you agree to our "}
           <Link href="/terms" className="underline">
             Terms of Service
           </Link>{' '}
@@ -205,4 +205,10 @@ export default function SignUpPage() {
   );
 }
 
-// Made with Bob
+export default function SignUpPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white dark:bg-gray-900" />}>
+      <SignUpPageContent />
+    </Suspense>
+  );
+}
