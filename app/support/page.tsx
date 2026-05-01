@@ -425,5 +425,3 @@ export default function SupportPage() {
     </div>
   );
 }
-
-// Made with Bob
