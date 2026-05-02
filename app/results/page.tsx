@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StructuredMarkdown } from '@/components/structured-markdown';
 import { Header } from '@/components/layout/header';
 import { Footer } from '@/components/layout/footer';
 import { useStore } from '@/lib/store';
@@ -291,9 +292,7 @@ export default function ResultsPage() {
                     <CardDescription>{explanation.level} walkthrough</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                      {explanation.details}
-                    </p>
+                    <StructuredMarkdown content={explanation.details} className="space-y-4" />
                   </CardContent>
                 </Card>
               )}
@@ -304,9 +303,7 @@ export default function ResultsPage() {
                     <CardTitle>Onboarding Guide</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    <p className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                      {onboarding.overview}
-                    </p>
+                    <StructuredMarkdown content={onboarding.overview} className="space-y-4" />
                     {onboarding.gettingStarted.length > 0 && (
                       <div>
                         <h3 className="font-semibold mb-2">Getting Started</h3>
@@ -330,17 +327,46 @@ export default function ResultsPage() {
                     {documentation.readme && (
                       <div>
                         <h3 className="font-semibold mb-2">README Draft</h3>
-                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                          {documentation.readme}
-                        </p>
+                        <StructuredMarkdown
+                          content={documentation.readme}
+                          className="space-y-4 text-sm"
+                        />
                       </div>
                     )}
                     {documentation.architectureDocs && (
                       <div>
                         <h3 className="font-semibold mb-2">Architecture Notes</h3>
-                        <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap">
-                          {documentation.architectureDocs}
-                        </p>
+                        <StructuredMarkdown
+                          content={documentation.architectureDocs}
+                          className="space-y-4 text-sm"
+                        />
+                      </div>
+                    )}
+                    {documentation.setupGuide && (
+                      <div>
+                        <h3 className="font-semibold mb-2">Setup Guide</h3>
+                        <StructuredMarkdown
+                          content={documentation.setupGuide}
+                          className="space-y-4 text-sm"
+                        />
+                      </div>
+                    )}
+                    {documentation.contributingGuide && (
+                      <div>
+                        <h3 className="font-semibold mb-2">Contributing Guide</h3>
+                        <StructuredMarkdown
+                          content={documentation.contributingGuide}
+                          className="space-y-4 text-sm"
+                        />
+                      </div>
+                    )}
+                    {documentation.apiDocs && (
+                      <div>
+                        <h3 className="font-semibold mb-2">API Notes</h3>
+                        <StructuredMarkdown
+                          content={documentation.apiDocs}
+                          className="space-y-4 text-sm"
+                        />
                       </div>
                     )}
                     {!documentation.readme && !documentation.architectureDocs && !documentation.apiDocs && (
