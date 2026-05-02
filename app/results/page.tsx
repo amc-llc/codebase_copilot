@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import {
+  ArrowLeft,
   Download,
   Code,
   BookOpen,
@@ -66,6 +67,14 @@ export default function ResultsPage() {
       <main className="flex-1 container mx-auto px-4 py-12">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
+            <div className="mb-4">
+              <Link href="/analyze">
+                <Button variant="ghost" className="px-0 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back To Analyze
+                </Button>
+              </Link>
+            </div>
             <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-4">
               <div>
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-2">
