@@ -1,6 +1,7 @@
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
 import { listProviderModels, resolveProviderModel } from './provider-models';
+import { DEFAULT_MAX_TOKENS } from './provider-metadata';
 
 export class IBMProvider extends BaseAIProvider {
   constructor(config: AIProviderConfig) {
@@ -23,7 +24,7 @@ export class IBMProvider extends BaseAIProvider {
           input: this.formatMessagesForIBM(messages),
           parameters: {
             temperature: this.config.temperature || 0.7,
-            max_new_tokens: this.config.maxTokens || 4000,
+            max_new_tokens: this.config.maxTokens || DEFAULT_MAX_TOKENS,
           },
         }),
       });
@@ -42,6 +43,7 @@ export class IBMProvider extends BaseAIProvider {
           totalTokens: (data.results?.[0]?.input_token_count || 0) + (data.results?.[0]?.generated_token_count || 0),
         },
         model,
+        stopReason: data.results?.[0]?.stop_reason,
       };
     } catch (error: any) {
       throw new Error(`IBM watsonx.ai API error: ${error.message}`);

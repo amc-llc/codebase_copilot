@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Save, Key, User, Bell, Shield } from 'lucide-react';
 import { storage } from '@/lib/utils/storage';
 import { AIProvider } from '@/types';
-import { getProviderDisplayName } from '@/lib/ai/provider-metadata';
+import { DEFAULT_MAX_TOKENS, getProviderDisplayName } from '@/lib/ai/provider-metadata';
 import { Footer } from '@/components/layout/footer';
 import { Header } from '@/components/layout/header';
 
@@ -100,7 +100,7 @@ export function SettingsPage() {
       apiKey,
       model: model || undefined,
       temperature: 0.7,
-      maxTokens: 4000,
+      maxTokens: DEFAULT_MAX_TOKENS,
     });
     setHasApiKey(!!apiKey);
     setSavedProvider(provider);

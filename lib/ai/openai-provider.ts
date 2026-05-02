@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
 import { listProviderModels, resolveProviderModel } from './provider-models';
+import { DEFAULT_MAX_TOKENS } from './provider-metadata';
 
 export class OpenAIProvider extends BaseAIProvider {
   private client: OpenAI;
@@ -24,7 +25,7 @@ export class OpenAIProvider extends BaseAIProvider {
           content: msg.content,
         })),
         temperature: this.config.temperature || 0.7,
-        max_tokens: this.config.maxTokens || 4000,
+        max_tokens: this.config.maxTokens || DEFAULT_MAX_TOKENS,
       });
 
       const choice = response.choices[0];
@@ -40,6 +41,7 @@ export class OpenAIProvider extends BaseAIProvider {
           totalTokens: response.usage.total_tokens,
         } : undefined,
         model: response.model,
+        stopReason: choice.finish_reason || undefined,
       };
     } catch (error: any) {
       throw new Error(`OpenAI API error: ${error.message}`);

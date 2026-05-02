@@ -1,4 +1,5 @@
 import { AIProviderConfig, UserPreferences } from '@/types';
+import { DEFAULT_MAX_TOKENS } from '@/lib/ai/provider-metadata';
 
 const STORAGE_KEYS = {
   PROVIDER_CONFIG: 'codebase_copilot_provider_config',
@@ -39,6 +40,10 @@ export const storage = {
       return {
         ...config,
         apiKey: decryptKey(config.apiKey),
+        maxTokens:
+          typeof config.maxTokens === 'number' && config.maxTokens !== 4000
+            ? config.maxTokens
+            : DEFAULT_MAX_TOKENS,
       };
     } catch {
       return null;

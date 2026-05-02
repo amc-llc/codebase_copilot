@@ -1,25 +1,27 @@
 import { AIProvider, AIProviderConfig } from '@/types';
 
+export const DEFAULT_MAX_TOKENS = 8000;
+
 const defaultConfigs: Record<AIProvider, Partial<AIProviderConfig>> = {
   ibm: {
     temperature: 0.7,
-    maxTokens: 4000,
+    maxTokens: DEFAULT_MAX_TOKENS,
   },
   openai: {
     temperature: 0.7,
-    maxTokens: 4000,
+    maxTokens: DEFAULT_MAX_TOKENS,
   },
   anthropic: {
     temperature: 0.7,
-    maxTokens: 4000,
+    maxTokens: DEFAULT_MAX_TOKENS,
   },
   google: {
     temperature: 0.7,
-    maxTokens: 4000,
+    maxTokens: DEFAULT_MAX_TOKENS,
   },
   ollama: {
     temperature: 0.7,
-    maxTokens: 4000,
+    maxTokens: DEFAULT_MAX_TOKENS,
   },
 };
 

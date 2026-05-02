@@ -2,6 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
 import { listProviderModels, resolveProviderModel } from './provider-models';
+import { DEFAULT_MAX_TOKENS } from './provider-metadata';
 
 export class AnthropicProvider extends BaseAIProvider {
   private client: Anthropic;
@@ -23,7 +24,7 @@ export class AnthropicProvider extends BaseAIProvider {
 
       const response = await this.client.messages.create({
         model,
-        max_tokens: this.config.maxTokens || 4000,
+        max_tokens: this.config.maxTokens || DEFAULT_MAX_TOKENS,
         temperature: this.config.temperature || 0.7,
         system: systemMessage?.content || this.getSystemPrompt(),
         messages: userMessages.map(msg => ({
@@ -45,6 +46,7 @@ export class AnthropicProvider extends BaseAIProvider {
           totalTokens: response.usage.input_tokens + response.usage.output_tokens,
         },
         model: response.model,
+        stopReason: response.stop_reason || undefined,
       };
     } catch (error: any) {
       throw new Error(`Anthropic API error: ${error.message}`);

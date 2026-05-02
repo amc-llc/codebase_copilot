@@ -13,6 +13,7 @@ export interface AIResponse {
     totalTokens: number;
   };
   model: string;
+  stopReason?: string;
 }
 
 export abstract class BaseAIProvider {

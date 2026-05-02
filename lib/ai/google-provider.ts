@@ -2,6 +2,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { BaseAIProvider, AIMessage, AIResponse } from './base-provider';
 import { AIProviderConfig } from '@/types';
 import { listProviderModels, resolveProviderModel } from './provider-models';
+import { DEFAULT_MAX_TOKENS } from './provider-metadata';
 
 export class GoogleProvider extends BaseAIProvider {
   private client: GoogleGenerativeAI;
@@ -40,13 +41,14 @@ export class GoogleProvider extends BaseAIProvider {
         history,
         generationConfig: {
           temperature: this.config.temperature || 0.7,
-          maxOutputTokens: this.config.maxTokens || 4000,
+          maxOutputTokens: this.config.maxTokens || DEFAULT_MAX_TOKENS,
         },
       });
 
       const result = await chat.sendMessage(prompt);
       const response = result.response;
       const text = response.text();
+      const candidate = (response as { candidates?: Array<{ finishReason?: string }> }).candidates?.[0];
 
       return {
         content: text,
@@ -56,6 +58,7 @@ export class GoogleProvider extends BaseAIProvider {
           totalTokens: 0,
         },
         model: modelName,
+        stopReason: candidate?.finishReason,
       };
     } catch (error: any) {
       throw new Error(`Google AI API error: ${error.message}`);

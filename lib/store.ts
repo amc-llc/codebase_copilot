@@ -6,6 +6,7 @@ import {
   UserPreferences, 
   AnalysisResult
 } from '@/types';
+import { DEFAULT_MAX_TOKENS } from '@/lib/ai/provider-metadata';
 
 interface StoreState extends AppState {
   // Actions
@@ -30,9 +31,8 @@ const defaultPreferences: UserPreferences = {
 const defaultProviderConfig: AIProviderConfig = {
   provider: 'ibm',
   apiKey: '',
-  model: 'ibm/granite-13b-chat-v2',
   temperature: 0.7,
-  maxTokens: 4000,
+  maxTokens: DEFAULT_MAX_TOKENS,
 };
 
 export const useStore = create<StoreState>()(

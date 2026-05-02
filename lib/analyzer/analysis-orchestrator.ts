@@ -34,6 +34,7 @@ import {
 } from '@/types';
 
 const PROJECT_NAME_FALLBACK = 'Uploaded Codebase';
+const MAX_CONTINUATION_ATTEMPTS = 2;
 
 export class AnalysisOrchestrator {
   private parser: CodebaseParser;
@@ -123,11 +124,10 @@ export class AnalysisOrchestrator {
     level: ExplanationLevel,
     providerConfig: AIProviderConfig
   ): Promise<Explanation> {
-    const provider = AIProviderFactory.createProvider(providerConfig);
     const prompt = this.buildExplanationPrompt(analysis, level);
-    const response = await provider.chat([{ role: 'user', content: prompt }]);
+    const response = await this.generateLongFormText(providerConfig, prompt);
 
-    return this.parseExplanationResponse(response.content, level);
+    return this.parseExplanationResponse(response, level);
   }
 
   private buildExplanationPrompt(analysis: CodeAnalysis, level: ExplanationLevel): string {
@@ -186,7 +186,6 @@ Cover architecture, key modules, runtime flow, and how to navigate it effectivel
     analysis: CodeAnalysis,
     providerConfig: AIProviderConfig
   ): Promise<OnboardingGuide> {
-    const provider = AIProviderFactory.createProvider(providerConfig);
     const prompt = `Generate an onboarding guide for this codebase:
 
 ${JSON.stringify(analysis.metadata, null, 2)}
@@ -195,16 +194,16 @@ Architecture: ${analysis.architecture.description}
 Key files: ${analysis.keyFiles.map((file) => file.path).join(', ')}
 
 Return a practical guide with setup steps, common pitfalls, and a short learning path.`;
-    const response = await provider.chat([{ role: 'user', content: prompt }]);
+    const response = await this.generateLongFormText(providerConfig, prompt);
 
     return {
-      overview: response.content.slice(0, 600),
-      gettingStarted: this.extractBullets(response.content, ['setup', 'getting started']),
+      overview: response,
+      gettingStarted: this.extractBullets(response, ['setup', 'getting started']),
       keyFiles: analysis.keyFiles,
       architecture: analysis.architecture.description,
-      setupInstructions: this.extractBullets(response.content, ['setup', 'install']),
-      commonPitfalls: this.extractBullets(response.content, ['pitfall', 'watch out']),
-      suggestedTasks: this.extractBullets(response.content, ['task', 'next']),
+      setupInstructions: this.extractBullets(response, ['setup', 'install']),
+      commonPitfalls: this.extractBullets(response, ['pitfall', 'watch out']),
+      suggestedTasks: this.extractBullets(response, ['task', 'next']),
       learningPath: this.buildLearningPath(analysis.keyFiles),
     };
   }
@@ -213,21 +212,66 @@ Return a practical guide with setup steps, common pitfalls, and a short learning
     analysis: CodeAnalysis,
     providerConfig: AIProviderConfig
   ): Promise<Documentation> {
-    const provider = AIProviderFactory.createProvider(providerConfig);
     const prompt = `Generate documentation for this codebase:
 
 ${JSON.stringify(analysis.metadata, null, 2)}
 
 Create sections for README, architecture, setup, and contributing.`;
-    const response = await provider.chat([{ role: 'user', content: prompt }]);
+    const response = await this.generateLongFormText(providerConfig, prompt);
 
     return {
-      readme: this.extractSection(response.content, 'readme') || response.content,
-      architectureDocs: this.extractSection(response.content, 'architecture'),
-      setupGuide: this.extractSection(response.content, 'setup'),
-      contributingGuide: this.extractSection(response.content, 'contributing'),
-      apiDocs: this.extractSection(response.content, 'api'),
+      readme: this.extractSection(response, 'readme') || response,
+      architectureDocs: this.extractSection(response, 'architecture'),
+      setupGuide: this.extractSection(response, 'setup'),
+      contributingGuide: this.extractSection(response, 'contributing'),
+      apiDocs: this.extractSection(response, 'api'),
     };
+  }
+
+  private async generateLongFormText(
+    providerConfig: AIProviderConfig,
+    prompt: string
+  ): Promise<string> {
+    const provider = AIProviderFactory.createProvider(providerConfig);
+    const messages: Array<{ role: 'user' | 'assistant'; content: string }> = [
+      { role: 'user', content: prompt },
+    ];
+    const chunks: string[] = [];
+
+    for (let attempt = 0; attempt <= MAX_CONTINUATION_ATTEMPTS; attempt += 1) {
+      const response = await provider.chat(messages);
+      const chunk = response.content.trim();
+
+      if (!chunk) {
+        break;
+      }
+
+      chunks.push(chunk);
+
+      if (!this.shouldContinueResponse(response.stopReason)) {
+        break;
+      }
+
+      messages.push({ role: 'assistant', content: chunk });
+      messages.push({
+        role: 'user',
+        content:
+          'Continue exactly where you left off. Do not repeat anything you already wrote. Finish the remaining response only.',
+      });
+    }
+
+    return chunks.join('\n\n').trim();
+  }
+
+  private shouldContinueResponse(stopReason: string | undefined): boolean {
+    if (!stopReason) {
+      return false;
+    }
+
+    const normalized = stopReason.toLowerCase();
+    const truncationSignals = ['length', 'max_tokens', 'model_length', 'max_output_tokens'];
+
+    return truncationSignals.includes(normalized);
   }
 
   private extractSection(text: string, sectionName: string): string {
